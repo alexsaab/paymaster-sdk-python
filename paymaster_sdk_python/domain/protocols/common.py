@@ -155,13 +155,14 @@ class Common:
 
     # Получаем подпись
     @classmethod
-    def getsign(cls):
+    def get_sign(cls):
         sign = cls.LMI_MERCHANT_ID + ':' + str(cls.LMI_PAYMENT_AMOUNT) + ':' + cls.LMI_PAYMENT_DESC + ':' + cls.KEYPASS
-        return hashlib.md5(sign).hexdigest()
+        cls.SIGN = hashlib.md5(sign).hexdigest()
+        return cls.SIGN
 
     # Получаем LMI_HASH
     @classmethod
-    def getlmi_hash(cls):
+    def get_lmi_hash(cls):
         # Подготавливаем строчку для хеша
         stringToHash = cls.LMI_MERCHANT_ID + ";" + str(cls.LMI_PAYMENT_NO) + ";" + str(
             cls.LMI_SYS_PAYMENT_ID) + ";" + str(cls.LMI_SYS_PAYMENT_DATE) + ";" + str(
@@ -175,3 +176,7 @@ class Common:
             return base64.b64encode(hashlib.sha1(stringToHash).digest())
         elif cls.HASH_METHOD == 'sha256':
             return base64.b64encode(hashlib.sha256(stringToHash).digest())
+
+    @classmethod
+    def get_form(cls, url, method):
+        print(url, method)
