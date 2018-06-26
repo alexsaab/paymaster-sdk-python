@@ -1,9 +1,14 @@
-class CommonProtocol:
+import cgi
+import hashlib
+import base64
+
+
+class Common:
     # Идентификатор продавца
     # Идентификатор сайта в системе PayMaster.Идентификатор можно увидеть в Личном Кабинете, на странице
     # "Список сайтов" в первой колонке
     LMI_MERCHANT_ID = ''
-    
+
     # Сумма платежа
     # Сумма платежа, которую продавец желает получить от покупателя. Сумма должна быть больше нуля, дробная часть
     # отделяется точкой.
@@ -46,13 +51,13 @@ class CommonProtocol:
     # Замена Success URL
     # Если присутствует, то при успешном платеже пользователь будет отправлен по указанному URL
     # (а не установленному в настройках).
-    #Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
+    # Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
     LMI_SUCCESS_URL = ''
 
     # Замена Failure URL
     # Если присутствует, то при отмене платежа пользователь будет отправлен по указанному
     # URL (а не установленному в настройках).
-    #Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
+    # Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
     LMI_FAILURE_URL = ''
 
     # Телефон покупателя
@@ -68,17 +73,17 @@ class CommonProtocol:
 
     # Срок истечения счета
     # Дата и время, до которого действует выписанный счет. Формат YYYY-MM-DDThh:mm:ss, часовой пояс UTC.
-    #Внимание: система PayMaster приложит все усилия, чтобы отклонить платеж при истечении срока, но не
+    # Внимание: система PayMaster приложит все усилия, чтобы отклонить платеж при истечении срока, но не
     # может гарантировать этого.
     LMI_EXPIRES = ''
 
     # Идентификатор платежного метода
     # Идентификатор платежного метода, выбранный пользователем. Отсутствие означает, что пользователь будет
     # выбирать платежный метод на странице оплаты PayMaster.
-    #Платежный метод указан в настройках сайта в квадратных скобках рядом с названием платежной системы
+    # Платежный метод указан в настройках сайта в квадратных скобках рядом с названием платежной системы
     # (Например: Webmoney [WebMoney]).
-    #Рекомендуется поменять параметр LMI_PAYMENT_SYSTEM на LMI_PAYMENT_METHOD.
-    #Но LMI_PAYMENT_SYSTEM по-прежнему принимается и обрабатывается системой.
+    # Рекомендуется поменять параметр LMI_PAYMENT_SYSTEM на LMI_PAYMENT_METHOD.
+    # Но LMI_PAYMENT_SYSTEM по-прежнему принимается и обрабатывается системой.
     LMI_PAYMENT_METHOD = ''
 
     # Внешний идентификатор магазина в платежной системе
@@ -93,7 +98,6 @@ class CommonProtocol:
     # (Подписи и самого хеша)
     KEYPASS = ''
 
-
     # Подпись запроса (SIGN)
     # Этого параметра нет в https:#paymaster.ru/Partners/ru/docs/protocol
     # Так он необходим только для идентификации платежа
@@ -101,3 +105,73 @@ class CommonProtocol:
 
     # Как работаем с хешем, по какому алгоритму его шифруем для проверки подлинности запроса
     HASH_METHOD = 'md5'
+
+    # Перечисляем обязательные параметры
+    required = ('LMI_MERCHANT_ID', 'LMI_PAYMENT_AMOUNT', 'LMI_CURRENCY', 'LMI_PAYMENT_DESC', 'KEYPASS')
+
+    # Начинаем работать с онлайн-кассой
+    # Для начала забиваем корзину товара
+    LMI_SHOPPINGCART = {}
+
+    # Массив с обязательными параметрами для онлайн позиции (товара) онлайн кассы
+    cart_required = ('NAME', 'QTY', 'PRICE', 'TAX')
+
+    # URL для оплаты через форму
+    # Очень важно
+    url = 'https://paymaster.ru/Payment/Init'
+
+    # ставки НДС
+    # НДС 18%
+    # НДС 10%
+    # НДС по формуле 18/118
+    # НДС по формуле 10/110
+    # НДС 0%
+    # НДС не облагается
+    vatValues = ('vat18', 'vat10', 'vat118', 'vat110', 'vat0', 'no_vat')
+
+    # Переменная для хранения запроса
+    request = {}
+
+    @classmethod
+    def __init__(cls):
+        setattr(cls, 'request', cgi.FieldStorage())
+
+    @classmethod
+    def set(cls, instance, value):
+        getattr(cls, instance, value)
+
+    @classmethod
+    def get(cls, instance, default=None):
+        if getattr(cls, instance, default) is not None:
+            return getattr(cls, instance)
+        else:
+            return default
+
+    @classmethod
+    def test(cls):
+        setattr(cls, 'request', cgi.FieldStorage())
+        for i in cls.request.keys():
+            print(i + ": " + cls.request[i].value + "<br/>")
+
+    # Получаем подпись
+    @classmethod
+    def getsign(cls):
+        sign = cls.LMI_MERCHANT_ID + ':' + str(cls.LMI_PAYMENT_AMOUNT) + ':' + cls.LMI_PAYMENT_DESC + ':' + cls.KEYPASS
+        return hashlib.md5(sign).hexdigest()
+
+    # Получаем LMI_HASH
+    @classmethod
+    def getlmi_hash(cls):
+        # Подготавливаем строчку для хеша
+        stringToHash = cls.LMI_MERCHANT_ID + ";" + str(cls.LMI_PAYMENT_NO) + ";" + str(
+            cls.LMI_SYS_PAYMENT_ID) + ";" + str(cls.LMI_SYS_PAYMENT_DATE) + ";" + str(
+            cls.LMI_PAYMENT_AMOUNT) + ";" + cls.LMI_CURRENCY + ";" + cls.LMI_PAID_AMOUNT + ";" \
+                       + cls.LMI_PAID_CURRENCY + ";" + cls.LMI_PAYMENT_SYSTEM + ";" + str(
+            cls.LMI_SIM_MODE) + ";" + cls.KEYPASS;
+        # И кодируем хеш в соответствии с установленным алгоритмом для шифорования
+        if cls.HASH_METHOD == 'md5':
+            return base64.b64encode(hashlib.md5(stringToHash).digest())
+        elif cls.HASH_METHOD == 'sha1':
+            return base64.b64encode(hashlib.sha1(stringToHash).digest())
+        elif cls.HASH_METHOD == 'sha256':
+            return base64.b64encode(hashlib.sha256(stringToHash).digest())
