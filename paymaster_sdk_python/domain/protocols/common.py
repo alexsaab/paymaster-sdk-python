@@ -106,6 +106,9 @@ class Common:
     # Так он необходим только для идентификации платежа
     SIGN = ''
 
+    # Переменные, что возращаются при вычислении подписи (callback)
+    LMI_SYS_PAYMENT_ID = LMI_SYS_PAYMENT_DATE = LMI_PAID_AMOUNT = LMI_PAID_CURRENCY = LMI_PAYMENT_SYSTEM = ''
+
     # Как работаем с хешем, по какому алгоритму его шифруем для проверки подлинности запроса
     HASH_METHOD = 'md5'
 
@@ -219,7 +222,8 @@ class Common:
             o += '<input type="hidden" name="LMI_INVOICE_CONFIRMATION_URL" value="' + str(
                 cls.LMI_INVOICE_CONFIRMATION_URL) + '"/>\n'
         if cls.LMI_PAYMENT_NOTIFICATION_URL != "":
-            o += '<input type="hidden" name="LMI_PAYMENT_NOTIFICATION_URL" value="' + cls.LMI_PAYMENT_NOTIFICATION_URL + '"/>\n'
+            o += '<input type="hidden" name="LMI_PAYMENT_NOTIFICATION_URL" value="' + cls.LMI_PAYMENT_NOTIFICATION_URL \
+                 + '"/>\n'
         if cls.LMI_SUCCESS_URL != "":
             o += '<input type="hidden" name="LMI_SUCCESS_URL" value="' + cls.LMI_SUCCESS_URL + '"/>\n'
         if cls.LMI_FAILURE_URL != "":
