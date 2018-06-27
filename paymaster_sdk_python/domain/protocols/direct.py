@@ -116,9 +116,9 @@ class Direct:
         self.iat = time.time()
 
     # Получение подписи к запросу
-    def getSign(type = None):
+    def get_sign(self, request_type = None):
         # Получение какая функция вызвала getSign
-        if (!$type):
+        if (request_type is None):
             $backtrace = debug_backtrace();
             $type = $backtrace[1]['function'];
         }
