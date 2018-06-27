@@ -8,4 +8,4 @@ from paymaster_sdk_python.domain.protocols.common import Common
 print("Content-Type: text/html")
 print("")
 
-Common.test()
+print(Common.get_form('post'))

@@ -4,6 +4,9 @@ import base64
 
 
 class Common:
+    # Где лежит файл шаблона для формы
+    tempale_path = '../views/form.html'
+
     # Идентификатор продавца
     # Идентификатор сайта в системе PayMaster.Идентификатор можно увидеть в Личном Кабинете, на странице
     # "Список сайтов" в первой колонке
@@ -157,7 +160,7 @@ class Common:
     @classmethod
     def get_sign(cls):
         sign = cls.LMI_MERCHANT_ID + ':' + str(cls.LMI_PAYMENT_AMOUNT) + ':' + cls.LMI_PAYMENT_DESC + ':' + cls.KEYPASS
-        cls.SIGN = hashlib.md5(sign).hexdigest()
+        cls.SIGN = hashlib.md5(sign.encode('utf-8')).hexdigest()
         return cls.SIGN
 
     # Получаем LMI_HASH
@@ -177,6 +180,66 @@ class Common:
         elif cls.HASH_METHOD == 'sha256':
             return base64.b64encode(hashlib.sha256(stringToHash).digest())
 
+    # Получаем форму для получения платежа
     @classmethod
-    def get_form(cls, url, method):
-        print(url, method)
+    def get_form(cls, method):
+        # Рассчитываем подпись
+        cls.SIGN = cls.get_sign()
+        # Переменная для начала формаы оплаты
+        o = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Paymaster Payment</title>
+</head>
+<body>
+        """
+        # Переменная для футера формы оплаты
+        o_footer = """
+        </form>
+<script>
+    window.onload = function(){
+        document.forms['paymentForm'].submit();
+    }
+</script>
+</body>
+</html>
+        """
+        o += '<form method="' + method + '" action="' + cls.url + '" name="paymentForm">\n'
+        o += '<input type="hidden" name="LMI_MERCHANT_ID" value="' + cls.LMI_MERCHANT_ID + '"/>\n'
+        o += '<input type="hidden" name="LMI_PAYMENT_AMOUNT" value="' + str('%.2f' % cls.LMI_PAYMENT_AMOUNT) + '"/>\n'
+        o += '<input type="hidden" name="LMI_CURRENCY" value="' + cls.LMI_CURRENCY + '"/>\n'
+        o += '<input type="hidden" name="LMI_PAYMENT_DESC" value="' + cls.LMI_PAYMENT_DESC + '"/>\n'
+        if cls.LMI_PAYMENT_NO != "":
+            o += '<input type="hidden" name="LMI_PAYMENT_NO" value="' + str(cls.LMI_PAYMENT_NO) + '"/>\n'
+        if cls.LMI_SIM_MODE != "":
+            o += '<input type="hidden" name="LMI_SIM_MODE" value="' + str(cls.LMI_SIM_MODE) + '"/>\n'
+        if cls.LMI_INVOICE_CONFIRMATION_URL != "":
+            o += '<input type="hidden" name="LMI_INVOICE_CONFIRMATION_URL" value="' + str(
+                cls.LMI_INVOICE_CONFIRMATION_URL) + '"/>\n'
+        if cls.LMI_PAYMENT_NOTIFICATION_URL != "":
+            o += '<input type="hidden" name="LMI_PAYMENT_NOTIFICATION_URL" value="' + cls.LMI_PAYMENT_NOTIFICATION_URL + '"/>\n'
+        if cls.LMI_SUCCESS_URL != "":
+            o += '<input type="hidden" name="LMI_SUCCESS_URL" value="' + cls.LMI_SUCCESS_URL + '"/>\n'
+        if cls.LMI_FAILURE_URL != "":
+            o += '<input type="hidden" name="LMI_INVOICE_CONFIRMATION_URL" value="' + cls.LMI_FAILURE_URL + '"/>\n'
+        if cls.LMI_PAYER_PHONE_NUMBER != "":
+            o += '<input type="hidden" name="LMI_PAYER_PHONE_NUMBER" value="' + str(
+                cls.LMI_PAYER_PHONE_NUMBER) + '"/>\n'
+        if cls.LMI_PAYER_EMAIL != "":
+            o += '<input type="hidden" name="LMI_PAYER_EMAIL" value="' + cls.LMI_PAYER_EMAIL + '"/>\n'
+        if cls.LMI_EXPIRES != "":
+            o += '<input type="hidden" name="LMI_EXPIRES" value="' + str(cls.LMI_EXPIRES) + '"/>\n'
+        if cls.LMI_SHOP_ID != "":
+            o += '<input type="hidden" name="LMI_SHOP_ID" value="' + str(cls.LMI_SHOP_ID) + '"/>\n'
+        if cls.SIGN != "":
+            o += '<input type="hidden" name="LMI_SHOP_ID" value="' + cls.SIGN + '"/>\n'
+        for key, item in cls.LMI_SHOPPINGCART:
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].NAME" value="' + item.NAME + '"/>\n'
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].QTY" value="' + item.QTY + '"/>\n'
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].PRICE" value="' + str(
+                '%.2f' % item.PRICE) + '"/>\n'
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].TAX" value="' + item.TAX + '"/>\n'
+        o += o_footer
+        return o
