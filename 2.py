@@ -14,6 +14,4 @@ Common.LMI_CURRENCY = 'RUB'
 Common.LMI_PAYMENT_DESC = 'Тестовая транзакция'
 Common.KEYPASS = '12345'
 
-Common.LMI_SHOPPINGCART.
-
 print(Common.get_form('post'))

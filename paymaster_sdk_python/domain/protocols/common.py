@@ -117,10 +117,7 @@ class Common:
 
     # Начинаем работать с онлайн-кассой
     # Для начала забиваем корзину товара
-    LMI_SHOPPINGCART = {}
-
-    # Массив с обязательными параметрами для онлайн позиции (товара) онлайн кассы
-    cart_required = ('NAME', 'QTY', 'PRICE', 'TAX')
+    LMI_SHOPPINGCART = []
 
     # URL для оплаты через форму
     # Очень важно
@@ -138,35 +135,25 @@ class Common:
     # Переменная для хранения запроса
     request = {}
 
+    ##################################################################################################################
+    # Конструктор
+    ##################################################################################################################
     @classmethod
     def __init__(cls):
         setattr(cls, 'request', cgi.FieldStorage())
 
-    @classmethod
-    def set(cls, instance, value):
-        getattr(cls, instance, value)
-
-    @classmethod
-    def get(cls, instance, default=None):
-        if getattr(cls, instance, default) is not None:
-            return getattr(cls, instance)
-        else:
-            return default
-
-    @classmethod
-    def test(cls):
-        setattr(cls, 'request', cgi.FieldStorage())
-        for i in cls.request.keys():
-            print(i + ": " + cls.request[i].value + "<br/>")
-
+    ##################################################################################################################
     # Получаем подпись
+    ##################################################################################################################
     @classmethod
     def get_sign(cls):
         sign = cls.LMI_MERCHANT_ID + ':' + str(cls.LMI_PAYMENT_AMOUNT) + ':' + cls.LMI_PAYMENT_DESC + ':' + cls.KEYPASS
         cls.SIGN = hashlib.md5(sign.encode('utf-8')).hexdigest()
         return cls.SIGN
 
+    ##################################################################################################################
     # Получаем LMI_HASH
+    ##################################################################################################################
     @classmethod
     def get_lmi_hash(cls):
         # Подготавливаем строчку для хеша
@@ -177,15 +164,38 @@ class Common:
             cls.LMI_SIM_MODE) + ";" + cls.KEYPASS;
         # И кодируем хеш в соответствии с установленным алгоритмом для шифорования
         if cls.HASH_METHOD == 'md5':
-            return base64.b64encode(hashlib.md5(stringToHash).digest())
+            return base64.b64encode(hashlib.md5(stringToHash).hexdigest())
         elif cls.HASH_METHOD == 'sha1':
-            return base64.b64encode(hashlib.sha1(stringToHash).digest())
+            return base64.b64encode(hashlib.sha1(stringToHash).hexdigest())
         elif cls.HASH_METHOD == 'sha256':
-            return base64.b64encode(hashlib.sha256(stringToHash).digest())
+            return base64.b64encode(hashlib.sha256(stringToHash).hexdigest())
 
+    ##################################################################################################################
     # Получаем форму для получения платежа
+    ##################################################################################################################
     @classmethod
     def get_form(cls, method):
+        # Проверяем на правильность и заполненность всех параметров
+        for parameter in cls.required:
+            if getattr(cls, parameter) == '':
+                raise Exception('Parameter ' + parameter + ' is not set!')
+                exit()
+
+        # Теперь тоже самое, но для карточки с товаром (используется для онлайн кассы)
+        for item in cls.LMI_SHOPPINGCART:
+            if (item.NAME == '') or (item.NAME is None):
+                raise Exception('Parameter NAME for product is not set!')
+                exit()
+            if (item.QTY == '') or (item.QTY is None) or (val == int(item.QTY)):
+                raise Exception('Parameter QTY for product is not set on set not correctly please check it!')
+                exit()
+            if (item.PRICE == '') or (item.PRICE is None) or (val == float(item.PRICE)):
+                raise Exception('Parameter PRICE for product is not set on set not correctly please check it!')
+                exit()
+            if (item.TAX == '') or (item.TAX is None):
+                raise Exception('Parameter TAX for product is not set!')
+                exit()
+
         # Рассчитываем подпись
         cls.SIGN = cls.get_sign()
         # Переменная для начала формаы оплаты
