@@ -183,16 +183,16 @@ class Common:
 
         # Теперь тоже самое, но для карточки с товаром (используется для онлайн кассы)
         for item in cls.LMI_SHOPPINGCART:
-            if (item.NAME == '') or (item.NAME is None):
+            if (item['NAME'] == '') or (item['NAME'] is None):
                 raise Exception('Parameter NAME for product is not set!')
                 exit()
-            if (item.QTY == '') or (item.QTY is None) or (val == int(item.QTY)):
+            if (item['QTY'] == '') or (item['QTY'] is None) or (not int(item['QTY'])):
                 raise Exception('Parameter QTY for product is not set on set not correctly please check it!')
                 exit()
-            if (item.PRICE == '') or (item.PRICE is None) or (val == float(item.PRICE)):
+            if (item['PRICE'] == '') or (item['PRICE'] is None) or (not float(item['PRICE'])):
                 raise Exception('Parameter PRICE for product is not set on set not correctly please check it!')
                 exit()
-            if (item.TAX == '') or (item.TAX is None):
+            if (item['TAX'] == '') or (item['TAX'] is None):
                 raise Exception('Parameter TAX for product is not set!')
                 exit()
 
@@ -249,11 +249,13 @@ class Common:
             o += '<input type="hidden" name="LMI_SHOP_ID" value="' + str(cls.LMI_SHOP_ID) + '"/>\n'
         if cls.SIGN != "":
             o += '<input type="hidden" name="LMI_SHOP_ID" value="' + cls.SIGN + '"/>\n'
-        for key, item in cls.LMI_SHOPPINGCART:
-            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].NAME" value="' + item.NAME + '"/>\n'
-            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].QTY" value="' + item.QTY + '"/>\n'
-            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].PRICE" value="' + str(
-                '%.2f' % item.PRICE) + '"/>\n'
-            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + key + '].TAX" value="' + item.TAX + '"/>\n'
+        key = 0
+        for item in cls.LMI_SHOPPINGCART:
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + str(key) + '].NAME" value="' + item['NAME'] + '"/>\n'
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + str(key) + '].QTY" value="' + str(item['QTY']) + '"/>\n'
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + str(key) + '].PRICE" value="' + str(
+                '%.2f' % item['PRICE']) + '"/>\n'
+            o += '<input type="hidden" name="LMI_SHOPPINGCART.ITEM[' + str(key) + '].TAX" value="' + item['TAX'] + '"/>\n'
+            key += 1
         o += o_footer
         return o

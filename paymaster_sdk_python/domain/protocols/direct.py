@@ -1,135 +1,168 @@
 import cgi
+import requests
+import time
 
 
 class Direct:
-    # Идентификатор продавца
-    # Идентификатор сайта в системе PayMaster.Идентификатор можно увидеть в Личном Кабинете, на странице
-    # "Список сайтов" в первой колонке
-    LMI_MERCHANT_ID = ''
-    
+
+    # Словарь для хранения запроса
+    request = dict()
+
+    # Константа. Параметр всегда должен иметь значение "code"
+    response_type = 'code'
+
+    # Микровремя  iat
+    iat = 0
+
+    # Идентификатор Продавца в системе PayMaster
+    client_id = ''
+
+    # Идентификатор Проавца в системе PayMaster (тоже самое, что и client_id)
+    merchant_id = ''
+
+    # Идентификатор платежа в системе обязательный параметр, номер транзакции
+    merchant_transaction_id = ''
+
     # Сумма платежа
-    # Сумма платежа, которую продавец желает получить от покупателя. Сумма должна быть больше нуля, дробная часть
-    # отделяется точкой.
-    LMI_PAYMENT_AMOUNT = 0.00
+    amount = 0.00
 
     # Валюта платежа
-    # Идентификатор валюты платежа. Система PayMaster понимает как текстовый 3-буквенный код валюты (RUB),
-    # так и ISO-код (643) (см. http:#www.currency-iso.org/en/home/tables/table-a1.html)
-    LMI_CURRENCY = 'RUB'
+    currency = 'RUB'
 
-    # Внутренний номер счета продавца
-    # В этой переменной продавец задает номер счета (идентификатор покупки) в соответствии со своей системой учета.
-    # Несмотря на то, что параметр не является обязательным, мы рекомендуем всегда задавать его. Идентификатор должен
-    # представлять собой не пустую строку.
-    LMI_PAYMENT_NO = ''
+    # Описание платежа
+    description = ''
 
-    # Назначение платежа
-    # Описание товара или услуги. Формируется продавцом. Максимальная длина - 255 символов.
-    LMI_PAYMENT_DESC = ''
+    # Номер транзации в системе Paymaster
+    processor_transaction_id = ''
 
-    # Режим тестирования
-    # Дополнительное поле, определяющее режим тестирования. Действует только в режиме тестирования и может
-    # принимать одно из следующих значений:
-    # 0 или отсутствует: Для всех тестовых платежей сервис будет имитировать успешное выполнение;
-    # 1: Для всех тестовых платежей сервис будет имитировать выполнение с ошибкой (платеж не выполнен);
-    # 2: Около 80% запросов на платеж будут выполнены успешно, а 20% - не выполнены.
-    LMI_SIM_MODE = 0
+    # Номер платежа в системе
+    payment_id = ''
 
-    # Замена Invoice Confirmation URL
-    # Если присутствует, то запрос Invoice Confirmation будет отправляться по указанному URL
-    # (а не установленному в настройках). Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
-    LMI_INVOICE_CONFIRMATION_URL = ''
+    # URL для перенаправления клиента после успешной авторизации.  НЕ кодированная.
+    redirect_uri = ''
 
-    # Замена Payment Notification URL
-    # Если присутствует, то запрос Payment Notification будет отправляться по указанному URL
-    # (а не установленному в настройках).
-    # Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
-    LMI_PAYMENT_NOTIFICATION_URL = ''
+    # Идентификатор платежной системы
+    scope = '503'
+    # 503 тест, рабочие режимы bankcard webmoney
 
-    # Замена Success URL
-    # Если присутствует, то при успешном платеже пользователь будет отправлен по указанному URL
-    # (а не установленному в настройках).
-    # Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
-    LMI_SUCCESS_URL = ''
+    # Временный токен, присвоенный при запросе на авторизацию
+    code = ''
 
-    # Замена Failure URL
-    # Если присутствует, то при отмене платежа пользователь будет отправлен по указанному
-    # URL (а не установленному в настройках).
-    # Этот параметр игнорируется, если в настройках сайта запрещена замена URL.
-    LMI_FAILURE_URL = ''
 
-    # Телефон покупателя
-    # Номер телефона покупателя в международном формате без ведущих символов + (например, 79031234567).
-    # Эти данные используются системой PayMaster для оповещения пользователя о статусе платежа. Кроме того,
-    # некоторые платежные системы требуют указания номера телефона.
-    LMI_PAYER_PHONE_NUMBER = ''
+    # Постоянный token доступа
+    access_token = ''
 
-    # E-mail покупателя
-    # E-mail покупателя. Эти данные используются системой PayMaster для оповещения пользователя о статусе платежа.
-    # Кроме того, некоторые платежные системы требуют указания e-mail.
-    LMI_PAYER_EMAIL = ''
+    # Тип токена
+    token_type = ''
 
-    # Срок истечения счета
-    # Дата и время, до которого действует выписанный счет. Формат YYYY-MM-DDThh:mm:ss, часовой пояс UTC.
-    # Внимание: система PayMaster приложит все усилия, чтобы отклонить платеж при истечении срока, но не
-    # может гарантировать этого.
-    LMI_EXPIRES = ''
+    # Вермя действия (истечения)
+    expires_in = 0
 
-    # Идентификатор платежного метода
-    # Идентификатор платежного метода, выбранный пользователем. Отсутствие означает, что пользователь будет
-    # выбирать платежный метод на странице оплаты PayMaster.
-    # Платежный метод указан в настройках сайта в квадратных скобках рядом с названием платежной системы
-    # (Например: Webmoney [WebMoney]).
-    # Рекомендуется поменять параметр LMI_PAYMENT_SYSTEM на LMI_PAYMENT_METHOD.
-    # Но LMI_PAYMENT_SYSTEM по-прежнему принимается и обрабатывается системой.
-    LMI_PAYMENT_METHOD = ''
+    # Идентификатор учетной записи
+    account_identifier = ''
 
-    # Внешний идентификатор магазина в платежной системе
-    # Внешний идентификатор магазина, передаваемый интегратором в платежную систему.
-    # Указывается только при явном определении платежной системы (Указан параметр LMI_PAYMENT_SYSTEM).
-    # Для каждой платежной системы формат согласовывается отдельно.
-    # (Только для интеграторов!!!)
-    LMI_SHOP_ID = ''
+    # Константа. Всегда должен быть установлен на "authorization_code"
+    grant_type = 'authorization_code'
 
-    # Ключ
-    # Самое важно из этого всего ключевая фраза, которая испрользуется для формирования обоих хешей
-    # (Подписи и самого хеша)
-    KEYPASS = ''
 
-    # Подпись запроса (SIGN)
-    # Этого параметра нет в https:#paymaster.ru/Partners/ru/docs/protocol
-    # Так он необходим только для идентификации платежа
-    SIGN = ''
+    # Секретный ключ DIRECT от сайта
+    secret = ''
 
-    # Как работаем с хешем, по какому алгоритму его шифруем для проверки подлинности запроса
-    HASH_METHOD = 'md5'
+    # тип запроса
+    type = 'rest'
 
-    # Перечисляем обязательные параметры
-    required = ('LMI_MERCHANT_ID', 'LMI_PAYMENT_AMOUNT', 'LMI_CURRENCY', 'LMI_PAYMENT_DESC', 'KEYPASS')
+    #  подпись
+    sign = ''
 
-    # Начинаем работать с онлайн-кассой
-    # Для начала забиваем корзину товара
-    LMI_SHOPPINGCART = {}
 
-    # Массив с обязательными параметрами для онлайн позиции (товара) онлайн кассы
-    cart_required = ('NAME', 'QTY', 'PRICE', 'TAX')
+    # URLы список
+    # Базовый URL
+    urlBase = 'https://paymaster.ru/'
 
-    # URL для оплаты через форму
-    # Очень важно
-    url = 'https://paymaster.ru/Payment/Init'
+    # URL для формы авторизации (первый шаг)
+    urlGetAuthActionForm1  = ''
 
-    # ставки НДС
-    # НДС 18%
-    # НДС 10%
-    # НДС по формуле 18/118
-    # НДС по формуле 10/110
-    # НДС 0%
-    # НДС не облагается
-    vatValues = ('vat18', 'vat10', 'vat118', 'vat110', 'vat0', 'no_vat')
+    # URL для формы авторизации (второй шаг)
+    urlGetAuthActionForm2 = ''
 
-    # Переменная для хранения запроса
-    request = ()
+    # Авторизация
+    urlGetAuth = 'https://paymaster.ru/direct/security/auth'
 
+    # Получение token
+    urlGetToken = 'https://paymaster.ru/direct/security/token'
+
+    # Отзыв токена
+    urlRevoke = 'https://paymaster.ru/direct/security/revoke'
+
+    # Инициализация платежа
+    urlPaymentInit = 'https://paymaster.ru/direct/payment/init'
+
+    # Проведение платежа
+    urlPaymentComplete = 'https://paymaster.ru/direct/payment/complete'
+
+    # Инлайн токенизация карт
+    # Запрос авторизации
+    urlAuthorizeCard = 'https://paymaster.ru/direct/authorize/card'
+
+    # Подтверждение суммы списания
+    urlAuthorizeConfirm = 'https://paymaster.ru/direct/authorize/confirm'
+
+    # Проведение 3DSecure авторизации
+    # Завершение 3DSecure авторизации
+    urlAuthorizeComplete3ds = 'https://paymaster.ru/direct/authorize/complete3ds'
+
+    # Инициализация конструктор
     def __init__(self):
-        self.request = cgi.FieldStorage()
+        self.iat = time.time()
+
+    # Получение подписи к запросу
+    def getSign(type = None):
+        # Получение какая функция вызвала getSign
+        if (!$type):
+            $backtrace = debug_backtrace();
+            $type = $backtrace[1]['function'];
+        }
+
+        // Тело подписи
+        switch ($type) {
+            case "token": // Тело подписи при запросе постоянного токена
+                $body = 'client_id=' . $this->client_id . '&' . 'code=' . $this->code . '&' . 'grant_type=' .
+                    $this->grant_type . '&' . 'redirect_uri=' . urlencode($this->redirect_uri) . '&' . 'type=' .
+                    $this->type;
+                break;
+            case "revoke": // TODO отзыв token узнать как делать подпись в этот раз
+                $body = 'access_token=' . $this->access_token . '&' . 'client_id=' . $this->client_id . '&' .
+                    'code=' . $this->code . '&' . 'grant_type=' . $this->grant_type . '&' . 'redirect_uri=' .
+                    urlencode($this->redirect_uri) . '&' . 'type=' . $this->type;
+                break;
+            case "init": // Тело подписи при инициализации платежа
+                $body = 'access_token=' . $this->access_token . '&' . 'merchant_id=' . $this->client_id .
+                    '&' . 'merchant_transaction_id=' . urlencode($this->merchant_transaction_id) . '&' . 'amount=' .
+                    $this->amount . '&' . 'currency=' . $this->currency . '&' . 'description='
+                    . urlencode($this->description) . '&' . 'type=' . $this->type;
+                break;
+            case "complete": // Тело подписи при проведении платежа
+                $body = 'access_token=' . $this->access_token . '&' . 'merchant_id=' . $this->merchant_id . '&' .
+                    'merchant_transaction_id=' . urlencode($this->merchant_transaction_id) . '&' .
+                    'processor_transaction_id=' . $this->processor_transaction_id . '&' . 'type=' . $this->type;
+                var_dump($body);
+                break;
+            default:   // По умолчанию и при инийциализации
+            case "auth":
+                $body = 'response_type=' . $this->response_type . '&' . 'client_id=' . $this->client_id . '&' .
+                    'redirect_uri=' . urlencode($this->redirect_uri) . '&' . 'scope=' . $this->scope . '&' .
+                    'type=' . $this->type;
+                break;
+        }
+
+        // строка подписи
+        $clear_sign = $body . ';' . $this->iat . ';' . $this->secret;
+        // вычисление подписи
+        $this->sign = base64_encode(hash('sha256', $clear_sign, true));
+
+        var_dump($this->sign);
+
+        // Возвращаем подпись
+        return $this->sign;
+    }
 
