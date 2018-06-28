@@ -174,6 +174,7 @@ class Direct:
             respond = requests.post(self.urlGetAuthActionForm1, {})
         except Exception:
             print('Problem in get token form #1!')
+
         card_form = {
             'values[card_pan]': "4100000000000010",
             'values[card_month]': "6",
@@ -185,6 +186,7 @@ class Direct:
             respond = requests.post(self.urlGetAuthActionForm2, card_form)
         except Exception:
             print('Problem in get token form #2!')
+
         self.token = self._get_token(respond.text)
         return self.token
 
