@@ -1,7 +1,8 @@
-import cgi
 import requests
+import urllib
 import time
-
+import hashlib
+import base64
 
 class Direct:
 
@@ -118,51 +119,57 @@ class Direct:
     # Получение подписи к запросу
     def get_sign(self, request_type = None):
         # Получение какая функция вызвала getSign
-        if (request_type is None):
-            $backtrace = debug_backtrace();
-            $type = $backtrace[1]['function'];
+        # if (request_type is None):
+        #     $backtrace = debug_backtrace()
+        #     $type = $backtrace[1]['function']
+
+        # Тело подписи
+        # Тело подписи при запросе постоянного токена
+        if request_type == 'token':
+            body = 'client_id=' + self.client_id + '&' + 'code=' + self.code + '&' + 'grant_type=' + \
+                self.grant_type + '&' + 'redirect_uri=' + urllib.urlencode(self.redirect_uri) + '&' + 'type=' + \
+                self.type
+        # TODO отзыв token узнать как делать подпись в этот раз    
+        elif request_type == 'revoke':
+            body = 'access_token=' + self.access_token + '&' + 'client_id=' + self.client_id + '&' + \
+                    'code=' + self.code + '&' + 'grant_type=' + self.grant_type + '&' + 'redirect_uri=' + \
+                   urllib.urlencode(self.redirect_uri) + '&' + 'type=' + self.type
+        # Тело подписи при инициализации платежа
+        elif request_type == 'init': 
+            body = 'access_token=' + self.access_token + '&' + 'merchant_id=' + self.client_id + \
+                    '&' + 'merchant_transaction_id=' + urllib.urlencode(self.merchant_transaction_id) + '&' + \
+                    'amount=' + self.amount + '&' + 'currency=' + self.currency + '&' + 'description=' + \
+                    urllib.urlencode(self.description) + '&' + 'type=' + self.type
+        # Тело подписи при проведении платежа
+        elif request_type == 'complete':
+            body = 'access_token=' + self.access_token + '&' + 'merchant_id=' + self.merchant_id + '&' + \
+                    'merchant_transaction_id=' + urllib.urlencode(self.merchant_transaction_id) + '&' + \
+                    'processor_transaction_id=' + self.processor_transaction_id + '&' + 'type=' + self.type
+        elif request_type == 'auth':
+            body = 'response_type=' + self.response_type + '&' + 'client_id=' + self.client_id + '&' + \
+                    'redirect_uri=' + urllib.urlencode(self.redirect_uri) + '&' + 'scope=' + self.scope + '&' + \
+                    'type=' + self.type
+
+        # строка подписи
+        clear_sign = body + ';' + self.iat + ';' + self.secret
+        # вычисление подписи
+        self.sign = base64.b64encode(hashlib.sha256(clear_sign).hexdigest())
+        # Возвращаем подпись
+        return self.sign
+
+
+    # Авторизация
+    def auth(self):
+        fields = {
+            'response_type': self.response_type,
+            'client_id': self.client_id,
+            'redirect_uri': self.redirect_uri,
+            'scope': self.scope,
+            'type': self.type,
+            'sign': self.get_sign('auth'),
+            'iat': self.iat
         }
 
-        // Тело подписи
-        switch ($type) {
-            case "token": // Тело подписи при запросе постоянного токена
-                $body = 'client_id=' . $this->client_id . '&' . 'code=' . $this->code . '&' . 'grant_type=' .
-                    $this->grant_type . '&' . 'redirect_uri=' . urlencode($this->redirect_uri) . '&' . 'type=' .
-                    $this->type;
-                break;
-            case "revoke": // TODO отзыв token узнать как делать подпись в этот раз
-                $body = 'access_token=' . $this->access_token . '&' . 'client_id=' . $this->client_id . '&' .
-                    'code=' . $this->code . '&' . 'grant_type=' . $this->grant_type . '&' . 'redirect_uri=' .
-                    urlencode($this->redirect_uri) . '&' . 'type=' . $this->type;
-                break;
-            case "init": // Тело подписи при инициализации платежа
-                $body = 'access_token=' . $this->access_token . '&' . 'merchant_id=' . $this->client_id .
-                    '&' . 'merchant_transaction_id=' . urlencode($this->merchant_transaction_id) . '&' . 'amount=' .
-                    $this->amount . '&' . 'currency=' . $this->currency . '&' . 'description='
-                    . urlencode($this->description) . '&' . 'type=' . $this->type;
-                break;
-            case "complete": // Тело подписи при проведении платежа
-                $body = 'access_token=' . $this->access_token . '&' . 'merchant_id=' . $this->merchant_id . '&' .
-                    'merchant_transaction_id=' . urlencode($this->merchant_transaction_id) . '&' .
-                    'processor_transaction_id=' . $this->processor_transaction_id . '&' . 'type=' . $this->type;
-                var_dump($body);
-                break;
-            default:   // По умолчанию и при инийциализации
-            case "auth":
-                $body = 'response_type=' . $this->response_type . '&' . 'client_id=' . $this->client_id . '&' .
-                    'redirect_uri=' . urlencode($this->redirect_uri) . '&' . 'scope=' . $this->scope . '&' .
-                    'type=' . $this->type;
-                break;
-        }
+        respond = requests.post(self.urlGetAuth, fields)
 
-        // строка подписи
-        $clear_sign = $body . ';' . $this->iat . ';' . $this->secret;
-        // вычисление подписи
-        $this->sign = base64_encode(hash('sha256', $clear_sign, true));
-
-        var_dump($this->sign);
-
-        // Возвращаем подпись
-        return $this->sign;
-    }
-
+        print(respond)
