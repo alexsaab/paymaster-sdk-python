@@ -1,11 +1,12 @@
 import requests
-import urllib
+import urllib.parse
 import time
 import hashlib
 import base64
+from bs4 import BeautifulSoup
+
 
 class Direct:
-
     # Словарь для хранения запроса
     request = dict()
 
@@ -49,7 +50,6 @@ class Direct:
     # Временный токен, присвоенный при запросе на авторизацию
     code = ''
 
-
     # Постоянный token доступа
     access_token = ''
 
@@ -65,7 +65,6 @@ class Direct:
     # Константа. Всегда должен быть установлен на "authorization_code"
     grant_type = 'authorization_code'
 
-
     # Секретный ключ DIRECT от сайта
     secret = ''
 
@@ -75,13 +74,12 @@ class Direct:
     #  подпись
     sign = ''
 
-
     # URLы список
     # Базовый URL
-    urlBase = 'https://paymaster.ru/'
+    urlBase = 'https://paymaster.ru'
 
     # URL для формы авторизации (первый шаг)
-    urlGetAuthActionForm1  = ''
+    urlGetAuthActionForm1 = ''
 
     # URL для формы авторизации (второй шаг)
     urlGetAuthActionForm2 = ''
@@ -114,49 +112,45 @@ class Direct:
 
     # Инициализация конструктор
     def __init__(self):
-        self.iat = time.time()
+        self.iat = int(round(time.time()))
 
-    # Получение подписи к запросу
-    def get_sign(self, request_type = None):
-        # Получение какая функция вызвала getSign
-        # if (request_type is None):
-        #     $backtrace = debug_backtrace()
-        #     $type = $backtrace[1]['function']
-
+    # Получение подписи к запросуё
+    def get_sign(self, request_type=None):
+        body = ''
+        # ругается на предупреждение
         # Тело подписи
         # Тело подписи при запросе постоянного токена
         if request_type == 'token':
             body = 'client_id=' + self.client_id + '&' + 'code=' + self.code + '&' + 'grant_type=' + \
-                self.grant_type + '&' + 'redirect_uri=' + urllib.urlencode(self.redirect_uri) + '&' + 'type=' + \
-                self.type
+                   self.grant_type + '&' + 'redirect_uri=' + urllib.parse.quote(self.redirect_uri, safe='') + '&' + \
+                   'type=' + self.type
         # TODO отзыв token узнать как делать подпись в этот раз    
         elif request_type == 'revoke':
             body = 'access_token=' + self.access_token + '&' + 'client_id=' + self.client_id + '&' + \
-                    'code=' + self.code + '&' + 'grant_type=' + self.grant_type + '&' + 'redirect_uri=' + \
-                   urllib.urlencode(self.redirect_uri) + '&' + 'type=' + self.type
+                   'code=' + self.code + '&' + 'grant_type=' + self.grant_type + '&' + 'redirect_uri=' + \
+                   urllib.parse.quote(self.redirect_uri, safe='') + '&' + 'type=' + self.type
         # Тело подписи при инициализации платежа
-        elif request_type == 'init': 
+        elif request_type == 'init':
             body = 'access_token=' + self.access_token + '&' + 'merchant_id=' + self.client_id + \
-                    '&' + 'merchant_transaction_id=' + urllib.urlencode(self.merchant_transaction_id) + '&' + \
-                    'amount=' + self.amount + '&' + 'currency=' + self.currency + '&' + 'description=' + \
-                    urllib.urlencode(self.description) + '&' + 'type=' + self.type
+                   '&' + 'merchant_transaction_id=' + urllib.parse.quote(self.merchant_transaction_id, safe='') + '&' \
+                   + 'amount=' + str(self.amount) + '&' + 'currency=' + self.currency + '&' + 'description=' + \
+                   urllib.parse.quote(self.description, safe='') + '&' + 'type=' + self.type
         # Тело подписи при проведении платежа
         elif request_type == 'complete':
             body = 'access_token=' + self.access_token + '&' + 'merchant_id=' + self.merchant_id + '&' + \
-                    'merchant_transaction_id=' + urllib.urlencode(self.merchant_transaction_id) + '&' + \
-                    'processor_transaction_id=' + self.processor_transaction_id + '&' + 'type=' + self.type
+                   'merchant_transaction_id=' + urllib.parse.quote(self.merchant_transaction_id, safe='') + '&' + \
+                   'processor_transaction_id=' + str(self.processor_transaction_id) + '&' + 'type=' + self.type
         elif request_type == 'auth':
             body = 'response_type=' + self.response_type + '&' + 'client_id=' + self.client_id + '&' + \
-                    'redirect_uri=' + urllib.urlencode(self.redirect_uri) + '&' + 'scope=' + self.scope + '&' + \
-                    'type=' + self.type
+                   'redirect_uri=' + urllib.parse.quote(self.redirect_uri, safe='') + '&' + 'scope=' + \
+                   self.scope + '&' + 'type=' + self.type
 
         # строка подписи
-        clear_sign = body + ';' + self.iat + ';' + self.secret
+        clear_sign = body + ';' + str(self.iat) + ';' + self.secret
         # вычисление подписи
-        self.sign = base64.b64encode(hashlib.sha256(clear_sign).hexdigest())
+        self.sign = base64.b64encode(hashlib.sha256(clear_sign.encode()).digest()).decode('utf-8')
         # Возвращаем подпись
         return self.sign
-
 
     # Авторизация
     def auth(self):
@@ -170,6 +164,42 @@ class Direct:
             'iat': self.iat
         }
 
-        respond = requests.post(self.urlGetAuth, fields)
+        try:
+            respond = requests.post(self.urlGetAuth, fields)
+        except Exception:
+            print('Something went wrong!')
 
-        print(respond)
+        try:
+            self.urlGetAuthActionForm1 = self.urlBase + self._get_form_action(respond.text, 'mainForm')
+            respond = requests.post(self.urlGetAuthActionForm1, {})
+        except Exception:
+            print('Problem in get token form #1!')
+        card_form = {
+            'values[card_pan]': "4100000000000010",
+            'values[card_month]': "6",
+            'values[card_year]': str((int(time.strftime("%Y")) + 5)),
+            'values[card_cvv]': "111",
+        }
+        try:
+            self.urlGetAuthActionForm2 = self.urlBase + self._get_form_action(respond.text, 'proceedForm')
+            respond = requests.post(self.urlGetAuthActionForm2, card_form)
+        except Exception:
+            print('Problem in get token form #2!')
+        self.token = self._get_token(respond.text)
+        return self.token
+
+    # Получение экшена формы
+    # TODO Переделать на регулярки
+    @staticmethod
+    def _get_form_action(html, form_id):
+        soup = BeautifulSoup(html, 'html.parser')
+        action = soup.find('form', id=form_id).get('action')
+        return action
+
+    @staticmethod
+    # Получение токена
+    def _get_token(html):
+        soup = BeautifulSoup(html, 'html.parser')
+        url = soup.find('a', {'class': 'pp-button-ok pp-rounded-5px'}).get('href')
+        code = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)['code'][0]
+        return code

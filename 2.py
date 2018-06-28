@@ -3,14 +3,15 @@
 
 from paymaster_sdk_python.domain.protocols.direct import Direct
 
-
 # Print necessary headers.
-print("Content-Type: text/html")
-print("")
+# print("Content-Type: text/html")
+# print("")
 
-Direct.clien_id = 'e430408c-3213-4580-9c25-946677a01ea8'
-Direct.scope = '503'
-Direct.redirect_uri = 'RUB'
-Direct.secret = '12345'
+direct = Direct()
 
-Direct.auth()
+direct.client_id = 'e430408c-3213-4580-9c25-946677a01ea8'
+direct.scope = '503'
+direct.redirect_uri = 'http://test1.techpaymaster.ru'
+direct.secret = '12345'
+
+print('Token (временный), полученный при авторизации: %s' % (direct.auth()))
