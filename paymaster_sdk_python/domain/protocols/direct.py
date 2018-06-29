@@ -120,18 +120,19 @@ class Direct:
     # Инициализация конструктор
     def __init__(self):
         self.iat = int(round(time.time()))
+        self.token = None
+        self.code = None
 
     # Получение подписи к запросуё
-    def get_sign(self, request_type=None):
-        body = ''
+    def get_sign(self, request_type='auth'):
+        body = None
         # ругается на предупреждение
         # Тело подписи
         # Тело подписи при запросе постоянного токена
         if request_type == 'token':
-            print(self.type)
             body = 'client_id=' + self.client_id + '&' + 'code=' + self.code + '&' + 'grant_type=' + \
-                   self.grant_type + '&' + 'redirect_uri=' + urllib.parse.quote(self.redirect_uri, safe='') + '&' + \
-                   'type=' + str(self.type)
+                   self.grant_type + '&' + 'redirect_uri=' + urllib.parse.quote(self.redirect_uri, safe='') + '&' \
+                   + 'type=' + self.type
         # TODO отзыв token узнать как делать подпись в этот раз    
         elif request_type == 'revoke':
             body = 'access_token=' + self.access_token + '&' + 'client_id=' + self.client_id + '&' + \
@@ -140,20 +141,20 @@ class Direct:
         # Тело подписи при инициализации платежа
         elif request_type == 'init':
             body = 'access_token=' + self.access_token + '&' + 'merchant_id=' + self.client_id + \
-                   '&' + 'merchant_transaction_id=' + urllib.parse.quote(self.merchant_transaction_id, safe='') + '&' \
-                   + 'amount=' + str(self.amount) + '&' + 'currency=' + self.currency + '&' + 'description=' + \
-                   urllib.parse.quote(self.description, safe='') + '&' + 'type=' + self.type
+                   '&' + 'merchant_transaction_id=' + urllib.parse.quote(self.merchant_transaction_id) + \
+                   '&' + 'amount=' + str(self.amount) + '&' + 'currency=' + self.currency + '&' + 'description=' + \
+                   urllib.parse.quote_plus(str(self.description), safe='') + '&' + 'type=' + self.type
         # Тело подписи при проведении платежа
         elif request_type == 'complete':
             body = 'access_token=' + self.access_token + '&' + 'merchant_id=' + self.merchant_id + '&' + \
-                   'merchant_transaction_id=' + urllib.parse.quote(self.merchant_transaction_id, safe='') + '&' + \
+                   'merchant_transaction_id=' + urllib.parse.quote(str(self.merchant_transaction_id), safe='') + '&' + \
                    'processor_transaction_id=' + str(self.processor_transaction_id) + '&' + 'type=' + self.type
+        # Тело подписи при авторизации
         elif request_type == 'auth':
             body = 'response_type=' + self.response_type + '&' + 'client_id=' + self.client_id + '&' + \
                    'redirect_uri=' + urllib.parse.quote(self.redirect_uri, safe='') + '&' + 'scope=' + \
                    self.scope + '&' + 'type=' + self.type
-
-        # строка подписи
+        # Строка подписи
         clear_sign = body + ';' + str(self.iat) + ';' + self.secret
         # вычисление подписи
         self.sign = base64.b64encode(hashlib.sha256(clear_sign.encode()).digest()).decode('utf-8')
@@ -195,9 +196,8 @@ class Direct:
         except Exception:
             print('Problem in get token form #2!')
 
-        self.token = self._get_token(respond.text)
+        self.token = self.code = self._get_token(respond.text)
         return self.token
-
 
     # Получение постоянного токена
     def get_token(self):
@@ -213,29 +213,28 @@ class Direct:
 
         try:
             respond = requests.post(self.urlGetToken, fields)
-            respondObject = respond.text
+            respond_object = json.loads(respond.text)
 
-            if respondObject.status is not None:
-                if respondObject.status != 'failure':
-                    self.access_token = respondObject.access_token
-                    self.token_type = respondObject.token_type
-                    self.expires_in = respondObject.expires_in
-                    self.account_identifier = respondObject.account_identifier
+            if 'status' in respond_object:
+                if respond_object['status'] != 'failure':
+                    self.access_token = respond_object['access_token']
+                    self.token_type = respond_object['token_type']
+                    self.expires_in = respond_object['expires_in']
+                    self.account_identifier = respond_object['account_identifier']
                 else:
                     raise Exception('I can\'t get token. Error is happen.')
             else:
-                self.access_token = respondObject.access_token
-                self.token_type = respondObject.token_type
-                self.expires_in = respondObject.expires_in
-                self.account_identifier = respondObject.account_identifier
+                self.access_token = respond_object['access_token']
+                self.token_type = respond_object['token_type']
+                self.expires_in = respond_object['expires_in']
+                self.account_identifier = respond_object['account_identifier']
         except Exception:
             print('I can\'t get token. Error is happen.')
-
-        return respond.text
+        return self.access_token
 
     # Отзыв токена
     # TODO необходимо узнать, как формируется подпись
-    def refoke(self):
+    def revoke(self):
         fields = {
             'client_id': self.client_id,
             'access_token': self.access_token,
@@ -259,11 +258,12 @@ class Direct:
             raise Exception("Access token is must set! " +
                             "Please make auth at first and get constant token!")
 
-        self.merchant_transaction_id = transaction_id
-        self.amount = round(amount, 2)
-        self.description = desc
+        self.merchant_transaction_id = str(transaction_id)
+        self.amount = str(amount)
+        self.description = str(desc)
+        self.merchant_id = self.client_id
 
-        field = {
+        fields = {
             'access_token': self.access_token,
             'merchant_id': self.merchant_id,
             'merchant_transaction_id': self.merchant_transaction_id,
@@ -276,12 +276,53 @@ class Direct:
         }
 
         try:
-            respond = requests.post(self.urlPaymentInit, field)
+            respond = requests.post(self.urlPaymentInit, fields)
+            respond_object = json.loads(respond.text)
+
+            if 'status' in respond_object:
+                if respond_object['status'] != 'failure':
+                    self.processor_transaction_id = respond_object['processor_transaction_id']
+                else:
+                    raise Exception('I can\'t get processor transaction id. Error is happen.')
+            else:
+                self.processor_transaction_id = respond_object['processor_transaction_id']
+
         except Exception:
-            print('Can\'t connect with site ' + self.urlPaymentInit + '! Aborted.')
+            print('I can\'t get processor transaction id. Error is happen.')
             exit(1)
+        return self.processor_transaction_id
 
+    # Проведение платежа
+    def complete(self):
+        if self.processor_transaction_id is None:
+            raise Exception('Processor transaction id is must set!' +
+                            'Please make auth at first, init and get constanly token!')
+        fields = {
+            'access_token': self.access_token,
+            'merchant_id': self.merchant_id,
+            'merchant_transaction_id': self.merchant_transaction_id,
+            'processor_transaction_id': self.processor_transaction_id,
+            'sign': self.get_sign('complete'),
+            'type': self.type,
+            'iat': self.iat
+        }
+        try:
+            respond = requests.post(self.urlPaymentComplete, fields)
+            respond_object = json.loads(respond.text)
+            if 'status' in respond_object:
+                if respond_object['status'] != 'failure':
+                    self.processor_transaction_id = respond_object['processor_transaction_id']
+                    self.payment_id = respond_object['payment_id']
+                else:
+                    raise Exception('I can\'t get processor transaction id and complete transaction. Error is happen.')
+            else:
+                self.processor_transaction_id = respond_object['processor_transaction_id']
+                self.payment_id = respond_object['payment_id']
 
+        except Exception:
+            print('I can\'t get processor transaction id and complete transaction. Error is happen.')
+            exit(1)
+        return respond_object
 
     # Получение экшена формы
     # TODO Переделать на регулярки
