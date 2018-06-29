@@ -15,3 +15,4 @@ direct.redirect_uri = 'http://test1.techpaymaster.ru'
 direct.secret = '12345'
 
 print('Token (временный), полученный при авторизации: %s' % (direct.auth()))
+print('Постоянный объект токена, полученный при авторизации:' + direct.get_token())

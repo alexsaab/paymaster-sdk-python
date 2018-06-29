@@ -1,9 +1,13 @@
+# coding=<utf8>
+# -*- coding: <utf8> -*-
+
 import requests
 import urllib.parse
 import time
 import hashlib
 import base64
 from bs4 import BeautifulSoup
+import json
 
 
 class Direct:
@@ -17,13 +21,13 @@ class Direct:
     iat = 0
 
     # Идентификатор Продавца в системе PayMaster
-    client_id = ''
+    client_id = None
 
     # Идентификатор Проавца в системе PayMaster (тоже самое, что и client_id)
-    merchant_id = ''
+    merchant_id = None
 
     # Идентификатор платежа в системе обязательный параметр, номер транзакции
-    merchant_transaction_id = ''
+    merchant_transaction_id = None
 
     # Сумма платежа
     amount = 0.00
@@ -32,47 +36,50 @@ class Direct:
     currency = 'RUB'
 
     # Описание платежа
-    description = ''
+    description = None
 
     # Номер транзации в системе Paymaster
-    processor_transaction_id = ''
+    processor_transaction_id = None
 
     # Номер платежа в системе
-    payment_id = ''
+    payment_id = None
 
     # URL для перенаправления клиента после успешной авторизации.  НЕ кодированная.
-    redirect_uri = ''
+    redirect_uri = None
 
     # Идентификатор платежной системы
     scope = '503'
     # 503 тест, рабочие режимы bankcard webmoney
 
     # Временный токен, присвоенный при запросе на авторизацию
-    code = ''
+    code = None
 
     # Постоянный token доступа
-    access_token = ''
+    access_token = None
 
     # Тип токена
-    token_type = ''
+    token_type = None
 
     # Вермя действия (истечения)
     expires_in = 0
 
     # Идентификатор учетной записи
-    account_identifier = ''
+    account_identifier = None
 
     # Константа. Всегда должен быть установлен на "authorization_code"
     grant_type = 'authorization_code'
 
     # Секретный ключ DIRECT от сайта
-    secret = ''
+    secret = None
 
     # тип запроса
     type = 'rest'
 
-    #  подпись
-    sign = ''
+    # Подпись
+    sign = None
+
+    # Срок действия токена
+    expires_in = None
 
     # URLы список
     # Базовый URL
@@ -121,9 +128,10 @@ class Direct:
         # Тело подписи
         # Тело подписи при запросе постоянного токена
         if request_type == 'token':
+            print(self.type)
             body = 'client_id=' + self.client_id + '&' + 'code=' + self.code + '&' + 'grant_type=' + \
                    self.grant_type + '&' + 'redirect_uri=' + urllib.parse.quote(self.redirect_uri, safe='') + '&' + \
-                   'type=' + self.type
+                   'type=' + str(self.type)
         # TODO отзыв token узнать как делать подпись в этот раз    
         elif request_type == 'revoke':
             body = 'access_token=' + self.access_token + '&' + 'client_id=' + self.client_id + '&' + \
@@ -189,6 +197,91 @@ class Direct:
 
         self.token = self._get_token(respond.text)
         return self.token
+
+
+    # Получение постоянного токена
+    def get_token(self):
+        fields = {
+            'client_id': self.client_id,
+            'code': self.code,
+            'grant_type': self.grant_type,
+            'redirect_uri': self.redirect_uri,
+            'sign': self.get_sign('token'),
+            'type': self.type,
+            'iat': self.iat
+        }
+
+        try:
+            respond = requests.post(self.urlGetToken, fields)
+            respondObject = respond.text
+
+            if respondObject.status is not None:
+                if respondObject.status != 'failure':
+                    self.access_token = respondObject.access_token
+                    self.token_type = respondObject.token_type
+                    self.expires_in = respondObject.expires_in
+                    self.account_identifier = respondObject.account_identifier
+                else:
+                    raise Exception('I can\'t get token. Error is happen.')
+            else:
+                self.access_token = respondObject.access_token
+                self.token_type = respondObject.token_type
+                self.expires_in = respondObject.expires_in
+                self.account_identifier = respondObject.account_identifier
+        except Exception:
+            print('I can\'t get token. Error is happen.')
+
+        return respond.text
+
+    # Отзыв токена
+    # TODO необходимо узнать, как формируется подпись
+    def refoke(self):
+        fields = {
+            'client_id': self.client_id,
+            'access_token': self.access_token,
+            'sign': self.get_sign('revoke'),
+            'type': self.type,
+            'iat': self.iat
+        }
+        respond = requests.post(self.urlRevoke, fields)
+        return respond.text
+
+    # Инициализация платежа
+    def init(self, transaction_id=None, amount=None, desc=None):
+        if transaction_id is None:
+            raise Exception('Transaction id is not set!')
+        if (amount is None) or (not float(amount)):
+            raise Exception('Transaction amount is not set right!')
+        if desc is None:
+            raise Exception('Transaction description is not set!')
+
+        if (self.access_token is None) or (self.access_token == ''):
+            raise Exception("Access token is must set! " +
+                            "Please make auth at first and get constant token!")
+
+        self.merchant_transaction_id = transaction_id
+        self.amount = round(amount, 2)
+        self.description = desc
+
+        field = {
+            'access_token': self.access_token,
+            'merchant_id': self.merchant_id,
+            'merchant_transaction_id': self.merchant_transaction_id,
+            'amount': self.amount,
+            'currency': self.currency,
+            'description': self.description,
+            'sign': self.get_sign('init'),
+            'type': self.type,
+            'iat': self.iat
+        }
+
+        try:
+            respond = requests.post(self.urlPaymentInit, field)
+        except Exception:
+            print('Can\'t connect with site ' + self.urlPaymentInit + '! Aborted.')
+            exit(1)
+
+
 
     # Получение экшена формы
     # TODO Переделать на регулярки
